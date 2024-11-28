@@ -115,22 +115,66 @@ class EmailGenerator:
         
         return "Job Applicant"  # Default fallback
 
+    def extract_contact_details(self, resume_text):
+        """
+        Extract contact details including name, phone, email, and LinkedIn from resume
+        """
+        # Clean the text
+        clean_text = resume_text.strip()
+        
+        # Initialize contact details dictionary
+        contact_details = {
+            'name': self.extract_name_from_resume(clean_text),
+            'phone': None,
+            'email': None,
+            'linkedin': None
+        }
+        
+        # Phone number patterns
+        phone_patterns = [
+            r'\b(?:\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b',  # (123) 456-7890, 123-456-7890
+            r'\b\d{10}\b',  # 1234567890
+            r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'  # 123.456.7890
+        ]
+        
+        # Email pattern
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        
+        # LinkedIn pattern
+        linkedin_patterns = [
+            r'linkedin\.com/in/[\w-]+',
+            r'linkedin\.com/profile/[\w-]+'
+        ]
+        
+        # Extract phone
+        for pattern in phone_patterns:
+            match = re.search(pattern, clean_text)
+            if match:
+                contact_details['phone'] = match.group()
+                break
+        
+        # Extract email
+        email_match = re.search(email_pattern, clean_text)
+        if email_match:
+            contact_details['email'] = email_match.group()
+        
+        # Extract LinkedIn
+        for pattern in linkedin_patterns:
+            match = re.search(pattern, clean_text.lower())
+            if match:
+                contact_details['linkedin'] = "www." + match.group()
+                break
+        
+        return contact_details
+
     def generate_email(self, job_details, resume_text, tone):
         """
         Generates a personalized cold email based on the job details and resume.
-        
-        Args:
-            job_details (dict): Contains scraped job information
-            resume_text (str): Text content extracted from the resume
-            tone (str): Selected tone for the email
-        
-        Returns:
-            str: A formatted cold email with subject line and body
         """
         skills = ", ".join(job_details['primary_skills'])
         
-        # Extract name from resume
-        candidate_name = self.extract_name_from_resume(resume_text)
+        # Extract all contact details
+        contact_details = self.extract_contact_details(resume_text)
         
         email = self.chain.run({
             "job_title": job_details['title'],
@@ -146,8 +190,16 @@ class EmailGenerator:
         if sincerely_index != -1:
             email = email[:sincerely_index].strip()
 
-        # Append the signature with extracted name
-        signature = f"\n\nBest Regards,\n{candidate_name}"
+        # Create a comprehensive signature with all available contact details
+        signature = "\n\nBest Regards,\n"
+        signature += f"{contact_details['name']}"
+        
+        if contact_details['phone']:
+            signature += f"\nPhone: {contact_details['phone']}"
+        if contact_details['email']:
+            signature += f"\nEmail: {contact_details['email']}"
+        if contact_details['linkedin']:
+            signature += f"\nLinkedIn: {contact_details['linkedin']}"
+        
         email += signature
-
         return email 
