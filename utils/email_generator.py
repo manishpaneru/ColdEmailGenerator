@@ -119,51 +119,75 @@ class EmailGenerator:
         """
         Extract contact details including name, phone, email, and LinkedIn from resume
         """
-        # Clean the text
-        clean_text = resume_text.strip()
+        # Clean the text and split into lines for better processing
+        lines = resume_text.strip().split('\n')
+        clean_text = ' '.join(lines)  # Keep a full text version for backup search
         
         # Initialize contact details dictionary
         contact_details = {
-            'name': self.extract_name_from_resume(clean_text),
+            'name': None,
             'phone': None,
             'email': None,
-            'linkedin': None
+            'linkedin': None,
+            'location': None,
+            'portfolio': None
         }
         
-        # Phone number patterns
-        phone_patterns = [
-            r'\b(?:\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b',  # (123) 456-7890, 123-456-7890
-            r'\b\d{10}\b',  # 1234567890
-            r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'  # 123.456.7890
-        ]
+        # Patterns for contact information
+        patterns = {
+            'phone': [
+                r'(?:Phone|Tel|Mobile|Cell):?\s*(\+?\d[\d\s.-]{8,})',
+                r'\b(?:\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b',
+                r'\b\d{10}\b',
+                r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
+            ],
+            'email': [
+                r'(?:Email|E-mail):?\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})',
+                r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            ],
+            'linkedin': [
+                r'(?:LinkedIn|Profile):?\s*((?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|profile)\/[\w-]+)',
+                r'\blinkedin\.com\/(?:in|profile)\/[\w-]+\b'
+            ],
+            'location': [
+                r'(?:Location|Address):?\s*([\w\s,.-]+(?:\d{5})?)',
+                r'\b[A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\s*\d{5}\b'
+            ],
+            'portfolio': [
+                r'(?:Portfolio|Website|Blog):?\s*((?:https?:\/\/)?(?:www\.)?[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})',
+                r'\b(?:https?:\/\/)?(?:www\.)?[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            ]
+        }
         
-        # Email pattern
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        # Extract name first (using existing method)
+        contact_details['name'] = self.extract_name_from_resume(clean_text)
         
-        # LinkedIn pattern
-        linkedin_patterns = [
-            r'linkedin\.com/in/[\w-]+',
-            r'linkedin\.com/profile/[\w-]+'
-        ]
+        # Look for contact details in the first few lines (usually header section)
+        header_text = ' '.join(lines[:10])  # Check first 10 lines for header info
         
-        # Extract phone
-        for pattern in phone_patterns:
-            match = re.search(pattern, clean_text)
-            if match:
-                contact_details['phone'] = match.group()
-                break
+        # Extract each type of contact detail
+        for detail_type, detail_patterns in patterns.items():
+            # Try header section first
+            for pattern in detail_patterns:
+                match = re.search(pattern, header_text, re.IGNORECASE)
+                if match:
+                    value = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                    contact_details[detail_type] = value.strip()
+                    break
+            
+            # If not found in header, try full text
+            if not contact_details[detail_type]:
+                for pattern in detail_patterns:
+                    match = re.search(pattern, clean_text, re.IGNORECASE)
+                    if match:
+                        value = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                        contact_details[detail_type] = value.strip()
+                        break
         
-        # Extract email
-        email_match = re.search(email_pattern, clean_text)
-        if email_match:
-            contact_details['email'] = email_match.group()
-        
-        # Extract LinkedIn
-        for pattern in linkedin_patterns:
-            match = re.search(pattern, clean_text.lower())
-            if match:
-                contact_details['linkedin'] = "www." + match.group()
-                break
+        # Clean up LinkedIn URL
+        if contact_details['linkedin']:
+            if not contact_details['linkedin'].startswith(('http://', 'https://', 'www.')):
+                contact_details['linkedin'] = 'www.' + contact_details['linkedin']
         
         return contact_details
 
@@ -190,16 +214,28 @@ class EmailGenerator:
         if sincerely_index != -1:
             email = email[:sincerely_index].strip()
 
-        # Create a comprehensive signature with all available contact details
+        # Create a professional signature with all available contact details
         signature = "\n\nBest Regards,\n"
-        signature += f"{contact_details['name']}"
         
-        if contact_details['phone']:
-            signature += f"\nPhone: {contact_details['phone']}"
+        # Add name
+        if contact_details['name']:
+            signature += f"{contact_details['name']}\n"
+        
+        # Add contact information in a structured way
+        contact_lines = []
+        
         if contact_details['email']:
-            signature += f"\nEmail: {contact_details['email']}"
+            contact_lines.append(f"Email: {contact_details['email']}")
+        if contact_details['phone']:
+            contact_lines.append(f"Phone: {contact_details['phone']}")
         if contact_details['linkedin']:
-            signature += f"\nLinkedIn: {contact_details['linkedin']}"
+            contact_lines.append(f"LinkedIn: {contact_details['linkedin']}")
+        if contact_details['location']:
+            contact_lines.append(f"Location: {contact_details['location']}")
+        if contact_details['portfolio']:
+            contact_lines.append(f"Portfolio: {contact_details['portfolio']}")
+        
+        signature += '\n'.join(contact_lines)
         
         email += signature
         return email 
