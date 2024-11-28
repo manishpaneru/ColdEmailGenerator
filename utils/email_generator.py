@@ -4,6 +4,7 @@ from langchain.chains import LLMChain
 import os
 import re
 import spacy
+import subprocess
 
 class EmailGenerator:
     """
@@ -18,13 +19,23 @@ class EmailGenerator:
             model_name="mixtral-8x7b-32768"
         )
         
-        # Load spaCy model for name detection
+        # Load spaCy model with better error handling
         try:
             self.nlp = spacy.load("en_core_web_sm")
-        except:
-            # If model isn't installed, download it
-            os.system("python -m spacy download en_core_web_sm")
-            self.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            print("Downloading spaCy English model...")
+            try:
+                # Try using pip to install the model
+                subprocess.run(["pip", "install", "en-core-web-sm"], check=True)
+                self.nlp = spacy.load("en_core_web_sm")
+            except:
+                try:
+                    # If pip install fails, try using spacy download command
+                    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
+                    self.nlp = spacy.load("en_core_web_sm")
+                except:
+                    print("Warning: Could not load spaCy model. Name extraction will use fallback methods.")
+                    self.nlp = None
         
         # Updated template to use resume content and tone
         self.email_template = PromptTemplate(
@@ -72,13 +83,17 @@ class EmailGenerator:
         """
         # Clean the text
         clean_text = resume_text.strip().replace('\n', ' ')
-        first_line = clean_text.split('.')[0].strip()  # Get first line/sentence
-        
-        # Method 1: Using spaCy for Named Entity Recognition
-        doc = self.nlp(first_line)
-        person_names = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
-        if person_names:
-            return person_names[0]
+        first_line = clean_text.split('.')[0].strip()
+
+        # Method 1: Using spaCy for Named Entity Recognition (if available)
+        if self.nlp is not None:
+            try:
+                doc = self.nlp(first_line)
+                person_names = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
+                if person_names:
+                    return person_names[0]
+            except Exception as e:
+                print(f"spaCy name extraction failed: {e}")
         
         # Method 2: Common resume header patterns
         name_patterns = [
