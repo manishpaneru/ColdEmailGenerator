@@ -30,16 +30,6 @@ def main():
     # Resume upload
     uploaded_file = st.file_uploader("Upload your resume (PDF)", type=['pdf'])
     
-    # Initialize name variable
-    verified_name = None
-    
-    if uploaded_file:
-        resume_text = extract_text_from_pdf(uploaded_file)
-        extracted_name = email_generator.extract_name_from_resume(resume_text)
-        
-        # Let user verify/correct the extracted name
-        verified_name = st.text_input("Verify your name:", value=extracted_name)
-    
     # Tone selection
     tone = st.selectbox(
         "Select email tone",
@@ -63,8 +53,7 @@ def main():
                         email_content = email_generator.generate_email(
                             job_details=job_details,
                             resume_text=resume_text,
-                            tone=tone.lower(),
-                            verified_name=verified_name  # Pass the verified name
+                            tone=tone.lower()
                         )
                         
                         # Display generated email
