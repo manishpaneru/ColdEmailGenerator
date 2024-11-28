@@ -115,7 +115,7 @@ class EmailGenerator:
         
         return "Job Applicant"  # Default fallback
 
-    def generate_email(self, job_details, resume_text, tone, verified_name=None):
+    def generate_email(self, job_details, resume_text, tone):
         """
         Generates a personalized cold email based on the job details and resume.
         
@@ -123,15 +123,14 @@ class EmailGenerator:
             job_details (dict): Contains scraped job information
             resume_text (str): Text content extracted from the resume
             tone (str): Selected tone for the email
-            verified_name (str, optional): User verified name to use in signature
         
         Returns:
             str: A formatted cold email with subject line and body
         """
         skills = ", ".join(job_details['primary_skills'])
         
-        # Use verified name if provided, otherwise extract from resume
-        candidate_name = verified_name if verified_name else self.extract_name_from_resume(resume_text)
+        # Extract name from resume
+        candidate_name = self.extract_name_from_resume(resume_text)
         
         email = self.chain.run({
             "job_title": job_details['title'],
@@ -147,7 +146,7 @@ class EmailGenerator:
         if sincerely_index != -1:
             email = email[:sincerely_index].strip()
 
-        # Append the signature with verified name
+        # Append the signature with extracted name
         signature = f"\n\nBest Regards,\n{candidate_name}"
         email += signature
 
